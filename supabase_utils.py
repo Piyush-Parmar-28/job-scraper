@@ -4,6 +4,7 @@ from typing import Optional, Any, Dict
 from models import Resume
 import datetime # Import datetime module
 import logging # Import logging
+import requests as _requests  # used as fallback for storage downloads
 
 # --- Initialize Supabase Client ---
 # Ensure URL and Key are provided
@@ -535,30 +536,70 @@ def download_resume_from_storage(file_name: str = "resume.pdf") -> Optional[byte
     """
     Downloads the user's resume PDF from the 'resumes' Supabase Storage bucket.
 
+    Strategy:
+      1. Try the native supabase-py storage.download() (fast, no extra round-trip).
+      2. If that raises a JSONDecodeError (a known supabase-py / storage3 bug where
+         the SDK tries to JSON-decode a binary response), fall back to fetching via a
+         short-lived signed URL using the requests library.
+
     Args:
         file_name: The name of the resume file in the storage bucket.
 
     Returns:
         The file content as bytes, or None if download fails.
     """
+    import json as _json
+
     bucket_name = config.SUPABASE_RESUME_STORAGE_BUCKET
     if not bucket_name:
         logging.error("Resume storage bucket name not configured (SUPABASE_RESUME_STORAGE_BUCKET).")
         return None
 
-    try:
-        logging.info(f"Downloading '{file_name}' from Supabase Storage bucket '{bucket_name}'...")
-        file_bytes = supabase.storage.from_(bucket_name).download(file_name)
+    logging.info(f"Downloading '{file_name}' from Supabase Storage bucket '{bucket_name}'...")
 
+    # --- Attempt 1: native SDK download ---
+    try:
+        file_bytes = supabase.storage.from_(bucket_name).download(file_name)
         if file_bytes:
-            logging.info(f"Successfully downloaded '{file_name}' ({len(file_bytes)} bytes).")
+            logging.info(f"Successfully downloaded '{file_name}' ({len(file_bytes)} bytes) via SDK.")
             return file_bytes
-        else:
-            logging.warning(f"Downloaded empty content for '{file_name}' from bucket '{bucket_name}'.")
+        logging.warning(f"SDK download returned empty content for '{file_name}'.")
+    except _json.JSONDecodeError:
+        # Known supabase-py bug: binary content gets passed to json.loads()
+        logging.warning(
+            f"SDK download hit a JSONDecodeError for '{file_name}' "
+            "(supabase-py/storage3 bug). Falling back to signed-URL download."
+        )
+    except Exception as e:
+        logging.warning(f"SDK download failed for '{file_name}': {e}. Trying signed-URL fallback.")
+
+    # --- Attempt 2: signed-URL fallback via requests ---
+    try:
+        signed = supabase.storage.from_(bucket_name).create_signed_url(file_name, expires_in=120)
+        # The returned dict key changed across SDK versions
+        signed_url = (
+            signed.get("signedURL")
+            or signed.get("signedUrl")
+            or (signed.get("data") or {}).get("signedUrl")
+            or (signed.get("data") or {}).get("signedURL")
+        )
+        if not signed_url:
+            logging.error(f"Could not extract signed URL from response: {signed}")
             return None
 
+        logging.info(f"Downloading '{file_name}' via signed URL...")
+        resp = _requests.get(signed_url, timeout=30)
+        resp.raise_for_status()
+
+        if resp.content:
+            logging.info(f"Successfully downloaded '{file_name}' ({len(resp.content)} bytes) via signed URL.")
+            return resp.content
+
+        logging.warning(f"Signed-URL download returned empty content for '{file_name}'.")
+        return None
+
     except Exception as e:
-        logging.error(f"Error downloading '{file_name}' from Supabase Storage: {e}")
+        logging.error(f"Signed-URL fallback also failed for '{file_name}': {e}")
         return None
 
 

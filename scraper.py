@@ -7,6 +7,7 @@ import logging
 import config
 import user_agents
 import supabase_utils
+import notifications
 from markdownify import markdownify as md
 import json
 
@@ -1867,6 +1868,7 @@ def process_careers_future_query(
 if __name__ == "__main__":
 
     total_new_jobs_saved = 0
+    all_new_jobs: list = []  # Collect all new jobs for the notification summary
 
     # =============================================================
     # LinkedIn
@@ -1964,6 +1966,10 @@ if __name__ == "__main__":
                                 )
                             )
 
+                            all_new_jobs.extend(
+                                new_linkedin_job_details
+                            )
+
                         else:
 
                             print(
@@ -2041,6 +2047,10 @@ if __name__ == "__main__":
                     )
                 )
 
+                all_new_jobs.extend(
+                    new_careers_future_job_details
+                )
+
             else:
 
                 logging.info(
@@ -2070,3 +2080,8 @@ if __name__ == "__main__":
         "Total new jobs saved across all queries: "
         f"{total_new_jobs_saved}"
     )
+
+    # -----------------------------------------------------------------
+    # Send notifications
+    # -----------------------------------------------------------------
+    notifications.notify_scrape_summary(total_new_jobs_saved, all_new_jobs)

@@ -12,6 +12,27 @@ load_dotenv()
 SUPABASE_URL: str = os.environ.get("SUPABASE_URL")
 SUPABASE_SERVICE_ROLE_KEY: str = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
 
+# =================================================================
+# NOTIFICATION SETTINGS
+# =================================================================
+
+# Recipient details (hardcoded defaults; override via env vars if needed)
+NOTIFICATION_EMAIL: str = os.environ.get("NOTIFICATION_EMAIL", "2822piyushparmar@gmail.com")
+NOTIFICATION_PHONE: str = os.environ.get("NOTIFICATION_PHONE", "917014628881")  # India (+91) prefix
+
+# Gmail SMTP — use an App Password, NOT your regular Gmail password.
+# Generate one at: https://myaccount.google.com/apppasswords
+GMAIL_SENDER_EMAIL: str = os.environ.get("GMAIL_SENDER_EMAIL", "")
+GMAIL_APP_PASSWORD: str = os.environ.get("GMAIL_APP_PASSWORD", "")
+
+# CallMeBot WhatsApp API key (free).
+# One-time setup: send "I allow callmebot to send me messages"
+# to +34 644 13 72 11 on WhatsApp — they'll reply with your API key.
+CALLMEBOT_API_KEY: str = os.environ.get("CALLMEBOT_API_KEY", "")
+
+# Minimum resume score (0-100) that triggers a high-match notification
+NOTIFICATION_SCORE_THRESHOLD: int = int(os.environ.get("NOTIFICATION_SCORE_THRESHOLD", "70"))
+
 SUPABASE_TABLE_NAME: str = "jobs"
 SUPABASE_CUSTOMIZED_RESUMES_TABLE_NAME = "customized_resumes"
 
