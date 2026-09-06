@@ -6,14 +6,18 @@ load_dotenv()
 # --- DO NOT MODIFY THE BELOW SECTION ---
 
 # =================================================================
-# 1. CORE SYSTEM CONFIGURATION (Do Not Modify)
+# 1. CORE SYSTEM CONFIGURATION (Do not Modify)
 # =================================================================
+
 SUPABASE_URL: str = os.environ.get("SUPABASE_URL")
 SUPABASE_SERVICE_ROLE_KEY: str = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+
 SUPABASE_TABLE_NAME: str = "jobs"
 SUPABASE_CUSTOMIZED_RESUMES_TABLE_NAME = "customized_resumes"
+
 SUPABASE_STORAGE_BUCKET = "personalized_resumes"
 SUPABASE_RESUME_STORAGE_BUCKET = "resumes"
+
 SUPABASE_BASE_RESUME_TABLE_NAME = "base_resume"
 BASE_RESUME_PATH = "resume.json"
 
@@ -24,19 +28,23 @@ LLM_API_KEY = (
     or os.environ.get("GEMINI_FIRST_API_KEY")
 )
 
+
 # =================================================================
 # 2. USER PREFERENCES (Editable)
 # =================================================================
 
 # --- LLM Settings ---
+
 # Use any model supported by LiteLLM
 # (gemini, openai/gpt-4o-mini, groq/llama-3.3-70b-versatile)
+#
 # Full list of supported models & naming:
 # https://docs.litellm.ai/docs/providers
+
 LLM_MODEL = "gemini"
 
 
-# --- Search Configuration ---
+# --- LinkedIn Search Configuration ---
 
 LINKEDIN_SEARCH_QUERIES = [
     "software developer",
@@ -87,20 +95,50 @@ LINKEDIN_LOCATIONS = {
 }
 
 
-LINKEDIN_JOB_TYPE = "F"  # F=Full-time, C=Contract, P=Part-time,
-                          # T=Temporary, I=Internship
+# -----------------------------------------------------------------
+# LinkedIn Job Type
+#
+# F = Full-time
+# C = Contract
+# P = Part-time
+# T = Temporary
+# I = Internship
+# -----------------------------------------------------------------
+
+LINKEDIN_JOB_TYPE = "F"
+
+
+# -----------------------------------------------------------------
+# LinkedIn Job Posting Date Filters
+#
+# r86400  = Past 24 hours
+# r604800 = Past week
+# -----------------------------------------------------------------
 
 LINKEDIN_JOB_POSTING_DATES = [
-    "r86400",    # Past 24 hours
-    "r604800",   # Past week
+    "r86400",
+    "r604800",
 ]
+
+
+# -----------------------------------------------------------------
+# LinkedIn Workplace Type
+#
+# 1 = Onsite
+# 2 = Remote
+# 3 = Hybrid
+# -----------------------------------------------------------------
 
 LINKEDIN_WORK_TYPES = [
-    1,  # Onsite
-    2,  # Remote
-    3,  # Hybrid
+    1,
+    2,
+    3,
 ]
 
+
+# --- CareersFuture Configuration ---
+# Kept for compatibility with the existing scraper.
+# Currently disabled because SCRAPING_SOURCES contains only "linkedin".
 
 CAREERS_FUTURE_SEARCH_QUERIES = [
     "IT Support",
@@ -144,16 +182,49 @@ LLM_RETRY_BASE_DELAY = 10
 LLM_DAILY_REQUEST_BUDGET = 0
 LLM_REQUEST_DELAY_SECONDS = 8
 
+
+# -----------------------------------------------------------------
+# LinkedIn Pagination
+#
+# LinkedIn pagination uses:
+#   start=0
+#   start=10
+#   start=20
+#   ...
+#
+# With the current scraper logic:
+#
+#   LINKEDIN_MAX_START = 1
+#
+# means only start=0 is requested.
+#
+# Use 10 for two pages:
+#   start=0
+#   start=10
+# -----------------------------------------------------------------
+
 LINKEDIN_MAX_START = 1
 
+
+# -----------------------------------------------------------------
+# HTTP Configuration
+# -----------------------------------------------------------------
+
 REQUEST_TIMEOUT = 30
+
 MAX_RETRIES = 3
 RETRY_DELAY_SECONDS = 15
+
+
+# -----------------------------------------------------------------
+# Job Lifecycle Configuration
+# -----------------------------------------------------------------
 
 JOB_EXPIRY_DAYS = 30
 JOB_CHECK_DAYS = 3
 JOB_DELETION_DAYS = 60
 JOB_CHECK_LIMIT = 50
+
 ACTIVE_CHECK_TIMEOUT = 20
 ACTIVE_CHECK_MAX_RETRIES = 2
 ACTIVE_CHECK_RETRY_DELAY = 10
