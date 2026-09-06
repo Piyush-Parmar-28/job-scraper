@@ -9,7 +9,6 @@ import os
 
 import config
 import supabase_utils
-import notifications
 from llm_client import primary_client
 
 # --- Setup Logging ---
@@ -278,10 +277,6 @@ def main():
     logging.info("--- Starting Job Scoring Script ---")
     overall_start_time = time.time()
 
-    # Accumulate high-scoring jobs across both scoring phases for a single notification
-    high_score_jobs: list = []
-    threshold = getattr(config, "NOTIFICATION_SCORE_THRESHOLD", 70)
-
     # --- Phase 1: Initial Scoring with Default Resume ---
     logging.info("--- Phase 1: Initial Scoring with Default Resume ---")
     initial_score_start_time = time.time()
@@ -332,8 +327,6 @@ def main():
                 if score is not None:
                     if supabase_utils.update_job_score(job_id, score, resume_score_stage="initial"):
                         successful_initial_scores += 1
-                        if score >= threshold:
-                            high_score_jobs.append({**job, "resume_score": score})
                     else:
                         failed_initial_scores += 1
                 else:
@@ -350,14 +343,7 @@ def main():
             logging.info(f"Total initial scoring time: {initial_score_end_time - initial_score_start_time:.2f} seconds")
 
     # # --- Phase 2: Re-scoring with Custom Resumes ---
-    rescore_jobs_with_custom_resume() 
-
-    # --- Send notification for high-scoring jobs found this run ---
-    if high_score_jobs:
-        logging.info(f"Sending high-score notification for {len(high_score_jobs)} job(s)...")
-        notifications.notify_high_scoring_jobs(high_score_jobs, threshold=threshold)
-    else:
-        logging.info("No high-scoring jobs this run — skipping notification.")
+    rescore_jobs_with_custom_resume()
 
     overall_end_time = time.time()
     logging.info("--- Job Scoring Script Finished (All Phases) ---")
