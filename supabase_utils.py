@@ -536,11 +536,9 @@ def download_resume_from_storage(file_name: str = "resume.pdf") -> Optional[byte
     """
     Downloads the user's resume PDF from the 'resumes' Supabase Storage bucket.
 
-    Strategy:
-      1. Try the native supabase-py storage.download() (fast, no extra round-trip).
-      2. If that raises a JSONDecodeError (a known supabase-py / storage3 bug where
-         the SDK tries to JSON-decode a binary response), fall back to fetching via a
-         short-lived signed URL using the requests library.
+    Bypasses the supabase-py storage SDK entirely (which has a JSONDecodeError bug
+    with binary files in certain versions) and calls the Supabase Storage REST API
+    directly using the requests library.
 
     Args:
         file_name: The name of the resume file in the storage bucket.
@@ -548,58 +546,41 @@ def download_resume_from_storage(file_name: str = "resume.pdf") -> Optional[byte
     Returns:
         The file content as bytes, or None if download fails.
     """
-    import json as _json
-
     bucket_name = config.SUPABASE_RESUME_STORAGE_BUCKET
+    supabase_url = config.SUPABASE_URL
+    service_key = config.SUPABASE_SERVICE_ROLE_KEY
+
     if not bucket_name:
         logging.error("Resume storage bucket name not configured (SUPABASE_RESUME_STORAGE_BUCKET).")
         return None
+    if not supabase_url or not service_key:
+        logging.error("SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY is not configured.")
+        return None
 
-    logging.info(f"Downloading '{file_name}' from Supabase Storage bucket '{bucket_name}'...")
+    # Direct REST API call — no SDK involved
+    url = f"{supabase_url.rstrip('/')}/storage/v1/object/{bucket_name}/{file_name}"
+    headers = {
+        "Authorization": f"Bearer {service_key}",
+        "apikey": service_key,
+    }
 
-    # --- Attempt 1: native SDK download ---
+    logging.info(f"Downloading '{file_name}' from Storage via REST API: {url}")
     try:
-        file_bytes = supabase.storage.from_(bucket_name).download(file_name)
-        if file_bytes:
-            logging.info(f"Successfully downloaded '{file_name}' ({len(file_bytes)} bytes) via SDK.")
-            return file_bytes
-        logging.warning(f"SDK download returned empty content for '{file_name}'.")
-    except _json.JSONDecodeError:
-        # Known supabase-py bug: binary content gets passed to json.loads()
-        logging.warning(
-            f"SDK download hit a JSONDecodeError for '{file_name}' "
-            "(supabase-py/storage3 bug). Falling back to signed-URL download."
-        )
-    except Exception as e:
-        logging.warning(f"SDK download failed for '{file_name}': {e}. Trying signed-URL fallback.")
+        resp = _requests.get(url, headers=headers, timeout=30)
 
-    # --- Attempt 2: signed-URL fallback via requests ---
-    try:
-        signed = supabase.storage.from_(bucket_name).create_signed_url(file_name, expires_in=120)
-        # The returned dict key changed across SDK versions
-        signed_url = (
-            signed.get("signedURL")
-            or signed.get("signedUrl")
-            or (signed.get("data") or {}).get("signedUrl")
-            or (signed.get("data") or {}).get("signedURL")
-        )
-        if not signed_url:
-            logging.error(f"Could not extract signed URL from response: {signed}")
-            return None
-
-        logging.info(f"Downloading '{file_name}' via signed URL...")
-        resp = _requests.get(signed_url, timeout=30)
-        resp.raise_for_status()
-
-        if resp.content:
-            logging.info(f"Successfully downloaded '{file_name}' ({len(resp.content)} bytes) via signed URL.")
+        if resp.status_code == 200:
+            logging.info(f"Successfully downloaded '{file_name}' ({len(resp.content)} bytes).")
             return resp.content
 
-        logging.warning(f"Signed-URL download returned empty content for '{file_name}'.")
+        # Provide a clear error if the file isn't found
+        logging.error(
+            f"Storage REST API returned HTTP {resp.status_code} for '{file_name}'. "
+            f"Response: {resp.text[:300]}"
+        )
         return None
 
     except Exception as e:
-        logging.error(f"Signed-URL fallback also failed for '{file_name}': {e}")
+        logging.error(f"Error downloading '{file_name}' via Storage REST API: {e}")
         return None
 
 
